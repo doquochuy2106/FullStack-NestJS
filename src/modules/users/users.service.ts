@@ -1,15 +1,75 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { User } from './schemas/user.schema';
+import { Model } from 'mongoose';
+import { InjectModel } from '@nestjs/mongoose';
+import { hashPasswordHelper } from '@/helpers/util';
+import aqp from 'api-query-params';
 
 @Injectable()
 export class UsersService {
-  create(createUserDto: CreateUserDto) {
-    return 'This action adds a new user';
+  constructor(@InjectModel(User.name) private userModel: Model<User>) {}
+
+  isExist = async (email: string) => {
+    const user = await this.userModel.exists({ email: email });
+    if (user) {
+      return true;
+    } else {
+      return false;
+    }
+  };
+
+  async create(createUserDto: CreateUserDto) {
+    const { name, email, phone, image, address } = createUserDto;
+    //check isEsixtEmail
+    const isEsixtEmail = await this.isExist(email);
+    if (isEsixtEmail) {
+      throw new BadRequestException(
+        `Email ${email} đã tồn tại , vui lòng nhập email khác!`,
+      );
+    } else {
+      //hash password
+      const hassPassword = await hashPasswordHelper(createUserDto.password);
+
+      const user = await this.userModel.create({
+        name: name,
+        email: email,
+        password: hassPassword,
+        phone: phone,
+        image: image,
+        address: address,
+      });
+      return {
+        _id: user._id,
+      };
+    }
   }
 
-  findAll() {
-    return `This action returns all users`;
+  async findAll(query: string, current: number, pageSize: number) {
+    const { filter, sort } = aqp(query);
+    if (filter.current) delete filter.current;
+    if (filter.pageSize) delete filter.pageSize;
+
+    if (!current) current = 1;
+    if (!pageSize) pageSize = 10;
+
+    const totalItems = (await this.userModel.find(filter)).length;
+    const totalPages = Math.ceil(totalItems / pageSize);
+
+    const skip = (current - 1) * pageSize;
+
+    const result = await this.userModel
+      .find(filter)
+      .limit(pageSize)
+      .skip(skip)
+      .select('-password')
+      .sort(sort as any);
+
+    return {
+      result,
+      totalPages,
+    };
   }
 
   findOne(id: number) {
