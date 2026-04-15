@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { User } from './schemas/user.schema';
-import { Model } from 'mongoose';
+import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { hashPasswordHelper } from '@/helpers/util';
 import aqp from 'api-query-params';
@@ -76,11 +76,28 @@ export class UsersService {
     return `This action returns a #${id} user`;
   }
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
+  async findByEmail(email: string) {
+    return await this.userModel.findOne({
+      email: email,
+    });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+  async update(updateUserDto: UpdateUserDto) {
+    return await this.userModel.updateOne(
+      { _id: updateUserDto._id },
+      {
+        ...updateUserDto,
+      },
+    );
+  }
+
+  async remove(_id: string) {
+    if (mongoose.isValidObjectId(_id)) {
+      return await this.userModel.deleteOne({
+        _id: _id,
+      });
+    } else {
+      throw new BadRequestException('_id không đúng dịnh dạng');
+    }
   }
 }
