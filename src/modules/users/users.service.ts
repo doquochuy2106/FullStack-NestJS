@@ -6,6 +6,9 @@ import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { hashPasswordHelper } from '@/helpers/util';
 import aqp from 'api-query-params';
+import { CreateAuthDto } from '@/auth/dto/create-auth.dto';
+import { v4 as uuidv4 } from 'uuid';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class UsersService {
@@ -28,22 +31,21 @@ export class UsersService {
       throw new BadRequestException(
         `Email ${email} đã tồn tại , vui lòng nhập email khác!`,
       );
-    } else {
-      //hash password
-      const hassPassword = await hashPasswordHelper(createUserDto.password);
-
-      const user = await this.userModel.create({
-        name: name,
-        email: email,
-        password: hassPassword,
-        phone: phone,
-        image: image,
-        address: address,
-      });
-      return {
-        _id: user._id,
-      };
     }
+    //hash password
+    const hassPassword = await hashPasswordHelper(createUserDto.password);
+
+    const user = await this.userModel.create({
+      name: name,
+      email: email,
+      password: hassPassword,
+      phone: phone,
+      image: image,
+      address: address,
+    });
+    return {
+      _id: user._id,
+    };
   }
 
   async findAll(query: string, current: number, pageSize: number) {
@@ -99,5 +101,32 @@ export class UsersService {
     } else {
       throw new BadRequestException('_id không đúng dịnh dạng');
     }
+  }
+
+  async handleRegister(registerDto: CreateAuthDto) {
+    const { name, email } = registerDto;
+    //check isEsixtEmail
+    const isEsixtEmail = await this.isExist(email);
+    if (isEsixtEmail) {
+      throw new BadRequestException(
+        `Email ${email} đã tồn tại , vui lòng nhập email khác!`,
+      );
+    }
+    //hash password
+    const hassPassword = await hashPasswordHelper(registerDto.password);
+    const user = await this.userModel.create({
+      name: name,
+      email: email,
+      password: hassPassword,
+      isActive: 'false',
+      codeId: uuidv4(),
+      codeExpired: dayjs().add(1, 'minutes'),
+    });
+
+    //trả ra phản hồi
+    return {
+      _id: user._id,
+    };
+    //send email
   }
 }
