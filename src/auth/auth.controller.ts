@@ -15,7 +15,7 @@ import { UpdateAuthDto } from './dto/update-auth.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { LocalAuthGuard } from './passport/local-auth.guard';
 import { JwtAuthGuard } from './passport/jwt-auth.guard';
-import { Public } from '@/decorator/customize';
+import { Public, ResponseMessage } from '@/decorator/customize';
 import { MailerService } from '@nestjs-modules/mailer';
 
 @Controller('auth')
@@ -27,6 +27,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
+  @ResponseMessage('Fetch Login')
   @UseGuards(LocalAuthGuard)
   async handleLogin(@Request() req) {
     return this.authService.login(req.user);
