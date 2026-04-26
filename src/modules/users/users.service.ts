@@ -6,7 +6,7 @@ import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { hashPasswordHelper } from '@/helpers/util';
 import aqp from 'api-query-params';
-import { CreateAuthDto } from '@/auth/dto/create-auth.dto';
+import { CodeAuthDto, CreateAuthDto } from '@/auth/dto/create-auth.dto';
 import { v4 as uuidv4 } from 'uuid';
 import dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
@@ -127,8 +127,8 @@ export class UsersService {
       password: hassPassword,
       isActive: 'false',
       codeId: codeId,
-      // codeExpired: dayjs().add(5, 'minutes'),
-      codeExpired: dayjs().add(30, 'seconds'),
+      codeExpired: dayjs().add(5, 'minutes'),
+      // codeExpired: dayjs().add(30, 'seconds'),
     });
 
     //send email
@@ -146,5 +146,27 @@ export class UsersService {
     return {
       _id: user._id,
     };
+  }
+
+  async handleCheckCode(checkCodeDto: CodeAuthDto) {
+    const user = await this.userModel.findOne({
+      _id: checkCodeDto._id,
+      codeId: checkCodeDto.code,
+    });
+    if (!user) {
+      throw new BadRequestException('Mã code không đúng');
+    }
+
+    const isBeforeCheckCode = dayjs().isBefore(user.codeExpired);
+    if (isBeforeCheckCode) {
+      //valid => update người dùng
+      await this.userModel.updateOne(
+        { _id: checkCodeDto._id },
+        { isActive: true },
+      );
+      return { isBeforeCheckCode };
+    } else {
+      throw new BadRequestException('Mã code đã hết hạn');
+    }
   }
 }
