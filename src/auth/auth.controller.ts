@@ -45,6 +45,12 @@ export class AuthController {
     return this.authService.handleCheckCode(checkCodeDto);
   }
 
+  @Post('retry-active')
+  @Public()
+  retryActive(@Body('email') email: string) {
+    return this.authService.retryActive(email);
+  }
+
   @Get('mail')
   @Public()
   async testMail() {

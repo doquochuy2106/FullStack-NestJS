@@ -169,4 +169,39 @@ export class UsersService {
       throw new BadRequestException('Mã code đã hết hạn');
     }
   }
+
+  async retryActive(email: string) {
+    const user = await this.userModel.findOne({ email: email });
+    if (!user) {
+      throw new BadRequestException('Tài khoản chưa được kich hoạt');
+    }
+    if (user.isActive === true) {
+      throw new BadRequestException('Tài khoản đã được kích hoạt');
+    }
+
+    //Resend Email
+
+    const codeId = uuidv4();
+
+    //update user
+    await user.updateOne({
+      codeId: codeId,
+      codeExpired: dayjs().add(5, 'minutes'),
+    });
+
+    //sendemail
+    this.mailService.sendMail({
+      to: user.email,
+      subject: 'Testing Nest MailerMoudle',
+      template: 'register',
+      context: {
+        name: user?.name ?? user.email,
+        activationCode: codeId,
+      },
+    });
+
+    return {
+      _id: user._id,
+    };
+  }
 }
