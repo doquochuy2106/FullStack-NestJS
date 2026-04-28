@@ -6,7 +6,11 @@ import mongoose, { Model } from 'mongoose';
 import { InjectModel } from '@nestjs/mongoose';
 import { hashPasswordHelper } from '@/helpers/util';
 import aqp from 'api-query-params';
-import { CodeAuthDto, CreateAuthDto } from '@/auth/dto/create-auth.dto';
+import {
+  ChangePasswordDto,
+  CodeAuthDto,
+  CreateAuthDto,
+} from '@/auth/dto/create-auth.dto';
 import { v4 as uuidv4 } from 'uuid';
 import dayjs from 'dayjs';
 import { MailerService } from '@nestjs-modules/mailer';
@@ -203,5 +207,68 @@ export class UsersService {
     return {
       _id: user._id,
     };
+  }
+
+  async retryPassword(email: string) {
+    const user = await this.userModel.findOne({ email: email });
+    if (!user) {
+      throw new BadRequestException(
+        'Tài khoản chưa được kich hoạt hoặc không tồn tại',
+      );
+    }
+
+    //Resend Email
+    const codeId = uuidv4();
+
+    //update user
+    await user.updateOne({
+      codeId: codeId,
+      codeExpired: dayjs().add(5, 'minutes'),
+    });
+
+    //sendemail
+    this.mailService.sendMail({
+      to: user.email,
+      subject: 'Testing Nest MailerMoudle',
+      template: 'register',
+      context: {
+        name: user?.name ?? user.email,
+        activationCode: codeId,
+      },
+    });
+
+    return {
+      _id: user._id,
+      email: user.email,
+    };
+  }
+
+  async changePassword(changePasswordDto: ChangePasswordDto) {
+    //check password
+    if (changePasswordDto.password !== changePasswordDto.confirmPassword) {
+      throw new BadRequestException(
+        'Mật khẩu và nhập lại mật khẩu không chính xác',
+      );
+    }
+
+    //check user
+    const user = await this.userModel.findOne({
+      email: changePasswordDto.email,
+    });
+    if (!user) {
+      throw new BadRequestException('Người dùng không tồn tại');
+    }
+
+    //check inpiredcode
+    const isBeforeCheckCode = dayjs().isBefore(user.codeExpired);
+    if (isBeforeCheckCode) {
+      const newPassword = await hashPasswordHelper(changePasswordDto.password);
+      await user.updateOne({
+        password: newPassword,
+      });
+      return { isBeforeCheckCode };
+    } else {
+      throw new BadRequestException('Mã code đã hết hạn');
+    }
   }
 }
